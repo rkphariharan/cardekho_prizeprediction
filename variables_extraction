@@ -1,0 +1,112 @@
+
+import os, re, ast, pandas as pd, numpy as np
+
+# -------------------------------------------------------------------
+# 1) Point these to the six raw files you uploaded
+RAW_FILES = [
+    r"C:\Users\rkpha\Desktop\cardekho\raw\bangalore_cars.xlsx",
+    r"C:\Users\rkpha\Desktop\cardekho\raw\chennai_cars.xlsx",
+    r"C:\Users\rkpha\Desktop\cardekho\raw\delhi_cars.xlsx",
+    r"C:\Users\rkpha\Desktop\cardekho\raw\hyderabad_cars.xlsx",
+    r"C:\Users\rkpha\Desktop\cardekho\raw\jaipur_cars.xlsx",
+    r"C:\Users\rkpha\Desktop\cardekho\raw\kolkata_cars.xlsx"
+]
+# -------------------------------------------------------------------
+
+# columns pulled directly from new_car_detail
+BASE_COLS  = [
+    'ft',          # fuel type
+    'km',          # kilometres driven
+    'bt',          # body type
+    'ownerNo',     # number of former owners
+    'model',       # car model
+    'modelYear',   # year of manufacture
+    'variantName', # trim / variant
+    'price',       # listing price (string, “₹ 8.11 Lakh”)
+    'priceActual'  # discounted price if present
+]
+EXTRA_COLS = ['transmission', 'oem']        
+# -------------------------------------------------------------------
+# Helper functions
+# -------------------------------------------------------------------
+
+def extract_engine_cc(overview_str):
+    """Dig engine displacement (cc) out of new_car_overview['top'] list."""
+    try:
+        ov = ast.literal_eval(overview_str)
+        for item in ov.get('top', []):
+            if 'engine displacement' in str(item.get('key', '')).lower():
+                val = item.get('value')
+                if val:
+                    # keep decimal if any
+                    m = re.search(r'([\d,.]+)', val)
+                    if m:
+                        return float(m.group(1).replace(',', ''))
+    except Exception:
+        pass
+    return np.nan
+
+def clean_km(val):
+    """'1,20,000' -> 120000  (int)."""
+    if pd.isna(val):
+        return np.nan
+    return int(re.sub(r'\D', '', str(val)))
+
+def clean_lakh_price(val):
+    """
+    Keep the lakh figure (with decimals) from a messy string.
+
+    '₹ 11.45 Lakh' -> 11.45
+    '8 Lakh'        -> 8.0
+    """
+    if pd.isna(val):
+        return np.nan
+    m = re.search(r'(\d+(?:\.\d+)?)', str(val).replace(',', ''))
+    return float(m.group(1)) if m else np.nan
+
+def clean_file(fp):
+    """Return a cleaned DataFrame for one raw *_cars.xlsx file."""
+    city = os.path.splitext(os.path.basename(fp))[0].replace('_cars', '')
+    raw  = pd.read_excel(fp)
+
+    rows = []
+    for _, row in raw.iterrows():
+        detail_str = row.get('new_car_detail')
+        if pd.isna(detail_str):
+            continue
+        try:
+            d = ast.literal_eval(detail_str)
+        except Exception:
+            continue
+
+        rec = {c: d.get(c) for c in BASE_COLS + EXTRA_COLS}
+        rec['engineCC'] = extract_engine_cc(row.get('new_car_overview'))
+        rec['City']     = city
+        rows.append(rec)
+
+    cleaned = pd.DataFrame(rows)
+
+    # ---- column-level cleaning ----
+    cleaned['km']          = cleaned['km'].apply(clean_km)
+    cleaned['price']       = cleaned['price'].apply(clean_lakh_price)
+    cleaned['priceActual'] = cleaned['priceActual'].apply(clean_lakh_price)
+    cleaned['ownerNo']     = pd.to_numeric(cleaned['ownerNo'], errors='coerce')
+    cleaned['modelYear']   = pd.to_numeric(cleaned['modelYear'], errors='coerce')
+    cleaned['engineCC']    = pd.to_numeric(cleaned['engineCC'], errors='coerce')
+
+    ordered = (
+        ['City'] +
+        BASE_COLS +
+        EXTRA_COLS +
+        ['engineCC']      
+    )
+    return cleaned[ordered]
+
+# -------------------------------------------------------------------
+# Main batch run
+# -------------------------------------------------------------------
+for fp in RAW_FILES:
+    cleaned_df = clean_file(fp)
+    out_fp = fp.replace('_cars.xlsx', '_cleaned_v2.xlsx')
+    cleaned_df.to_excel(out_fp, index=False)
+    print(f'Wrote {out_fp}   [{len(cleaned_df)} rows]')
