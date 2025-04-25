@@ -1,0 +1,68 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import os
+import zipfile
+
+# Load your dataset (change the path as needed)
+df = pd.read_csv(r"C:\Users\rkpha\Desktop\cardekho\preprocessed\merged_preprocessed.csv")
+save_path = r"C:\Users\rkpha\Desktop\cardekho\eda"  # <--- Your desired output folder
+
+# Create folder to store plots
+plot_dir = os.path.join(save_path, "eda_plots")
+
+os.makedirs(plot_dir, exist_ok=True)
+
+def save_figure(fig, name):
+    path = os.path.join(plot_dir, name)
+    fig.savefig(path, bbox_inches='tight', facecolor='white')
+    plt.close(fig)
+    return path
+
+saved_images = []
+
+# 1. Histograms
+for col in ['km', 'ownerNo', 'modelYear', 'engineCC', 'car_age', 'price']:
+    fig, ax = plt.subplots()
+    sns.histplot(df[col], kde=True, ax=ax)
+    ax.set_title(f"Histogram of {col}")
+    ax.set_xlabel(col)
+    ax.set_ylabel("Frequency")
+    saved_images.append(save_figure(fig, f"hist_{col}.png"))
+
+# 2. Correlation heatmap
+fig, ax = plt.subplots(figsize=(10, 8))
+corr = df.corr(numeric_only=True)
+sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
+ax.set_title("Correlation Heatmap")
+saved_images.append(save_figure(fig, "correlation_heatmap.png"))
+
+# 3. Box plots
+for col in ['km', 'ownerNo', 'engineCC', 'car_age']:
+    fig, ax = plt.subplots()
+    sns.boxplot(x=df[col], ax=ax)
+    ax.set_title(f"Box Plot of {col}")
+    saved_images.append(save_figure(fig, f"box_{col}.png"))
+
+# 4. Scatter plots
+for col in ['car_age', 'engineCC', 'km']:
+    fig, ax = plt.subplots()
+    sns.scatterplot(x=df[col], y=df['price'], ax=ax)
+    ax.set_title(f"Scatter Plot: {col} vs Price")
+    ax.set_xlabel(col)
+    ax.set_ylabel("Price (in Lakhs)")
+    saved_images.append(save_figure(fig, f"scatter_{col}_vs_price.png"))
+
+# 5. Zip all plots
+    zip_file_path = os.path.join(save_path, "EDA_Visuals.zip")
+    with zipfile.ZipFile(zip_file_path, 'w') as zipf:
+     for file in saved_images:
+        zipf.write(file, arcname=os.path.basename(file))
+
+print(f"✅ All visuals saved at: {save_path}")
+print(f"✅ ZIP created at: {zip_file_path}")
+
+
+
+
+
