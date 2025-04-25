@@ -1,110 +1,69 @@
-"""
-Smart Preprocessing Script for Car Price Prediction
-
-This version handles the renamed price column: "price(in lakhs)"
-- Selects only essential features
-- Creates 'car_age'
-- Handles missing values
-- Scales numeric features
-- Encodes categorical features
-- Saves one CSV per city + merged CSV
-
-Author: ChatGPT
-"""
+# preprocess_used_cars.py
 
 import os
 import pandas as pd
-import numpy as np
-from datetime import datetime
-from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
 
-# ---------------- CONFIGURATION ---------------- #
-INPUT_FILES = [
-    'bangalore.xlsx',
-    'chennai.xlsx',
-    'delhi.xlsx',
-    'hyderabad.xlsx',
-    'jaipur.xlsx',
-    'kolkata.xlsx'
-]
-INPUT_FOLDER = r"C:\Users\rkpha\Desktop\cardekho\structured"
-OUTPUT_FOLDER = r"C:\Users\rkpha\Desktop\cardekho\t"
+# ----------------- CONFIG -----------------
+input_dir = r"C:\Users\rkpha\Desktop\cardekho\structured"  # Folder where your cleaned Excel files are
+output_dir = r"C:\Users\rkpha\Desktop\cardekho\t"  # Folder to save preprocessed CSVs
+target_col = 'price(in lakhs)'  # Column to predict
 
-PRICE_COL = 'price(in lakhs)'  # <-- updated name
-SELECTED_NUM_COLS = ['km', 'ownerNo', 'modelYear', 'engineCC']
-SELECTED_CAT_COLS = ['ft', 'transmission']
-TARGET_COL = 'price'
-NUM_FINAL_COLS = SELECTED_NUM_COLS + ['car_age']
-# ------------------------------------------------ #
+# Features
+num_cols = ['km', 'ownerNo', 'modelYear', 'engineCC']  # Do NOT normalize target
+cat_cols = ['ft', 'bt', 'model', 'variantName', 'transmission', 'oem', 'City']
+# ------------------------------------------
 
-# Tools
+# Ensure output directory exists
+os.makedirs(output_dir, exist_ok=True)
+
+# Setup transformers
 num_imputer = SimpleImputer(strategy='median')
 cat_imputer = SimpleImputer(strategy='most_frequent')
 scaler = MinMaxScaler()
 encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
 
-merged_dfs = []
-current_year = datetime.now().year
 
-# Process each file
-for file in INPUT_FILES:
-    full_path = os.path.join(INPUT_FOLDER, file)
-    city = os.path.splitext(file)[0]
+preprocessed_dfs = []
 
-    df = pd.read_excel(full_path)
-    print(f"\n📄 Processing {file}... Columns:", df.columns.tolist())
+# Process each Excel file
+for filename in os.listdir(input_dir):
+    if filename.endswith(".xlsx"):
+        city_name = filename.replace(".xlsx", "")
+        print(f"Processing: {city_name}")
 
-    required_cols = SELECTED_CAT_COLS + SELECTED_NUM_COLS + [PRICE_COL]
-    missing = [col for col in required_cols if col not in df.columns]
+        df = pd.read_excel(os.path.join(input_dir, filename))
 
-    if missing:
-        print(f"❌ Skipping {file} - Missing columns: {missing}")
-        continue
+        # Handle missing
+        df[num_cols] = num_imputer.fit_transform(df[num_cols])
+        df[cat_cols] = cat_imputer.fit_transform(df[cat_cols])
 
-    # Rename price column for consistency
-    df = df[required_cols].copy()
-    df = df[df[PRICE_COL].notna()]
-    df.rename(columns={PRICE_COL: TARGET_COL}, inplace=True)
+        # Normalize numeric features (not price)
+        df[num_cols] = scaler.fit_transform(df[num_cols])
 
-    # Imputation
-    df[SELECTED_NUM_COLS] = num_imputer.fit_transform(df[SELECTED_NUM_COLS])
-    df[SELECTED_CAT_COLS] = cat_imputer.fit_transform(df[SELECTED_CAT_COLS])
+        # One-hot encode categorical features
+        encoded = pd.DataFrame(
+            encoder.fit_transform(df[cat_cols]),
+            columns=encoder.get_feature_names_out(cat_cols),
+            index=df.index
+        )
 
-    # Feature engineering
-    df['car_age'] = current_year - df['modelYear']
-    df[NUM_FINAL_COLS] = scaler.fit_transform(df[NUM_FINAL_COLS])
+        # Combine
+        df_final = pd.concat([df[[target_col]], df[num_cols], encoded], axis=1)
 
-    # One-hot encode categorical
-    encoded = pd.DataFrame(
-        encoder.fit_transform(df[SELECTED_CAT_COLS]),
-        columns=encoder.get_feature_names_out(SELECTED_CAT_COLS),
-        index=df.index
-    )
+        # Save individual CSV
+        out_path = os.path.join(output_dir, f"{city_name}_preprocessed.csv")
+        df_final.to_csv(out_path, index=False)
+        preprocessed_dfs.append(df_final)
 
-    # Final dataset
-    df_final = pd.concat([df[NUM_FINAL_COLS + [TARGET_COL]], encoded], axis=1)
+# Merge all datasets and save
+merged_df = pd.concat(preprocessed_dfs, ignore_index=True)
+merged_df.to_csv(os.path.join(output_dir, "all_cities_preprocessed.csv"), index=False)
 
-    # Save
-    out_path = os.path.join(OUTPUT_FOLDER, f"{city}_smart_preprocessed.csv")
-    df_final.to_csv(out_path, index=False)
-    print(f"✅ Saved: {out_path} ({len(df_final)} rows)")
-
-    merged_dfs.append(df_final)
-
-# Save merged dataset
-merged = pd.concat(merged_dfs, ignore_index=True)
-merged_path = os.path.join(OUTPUT_FOLDER, "all_cities_smart_preprocessed.csv")
-merged.to_csv(merged_path, index=False)
-print(f"\n📦 Merged dataset saved to {merged_path} ({len(merged)} rows)")
+print("✅ Preprocessing complete. All files saved in:", output_dir)  
 
 
-Feature	        Type	                   Transformation
-ft	            Categorical	            One-hot encoded
-km	            Numeric                	Median imputed + MinMax scaled
-ownerNo	        Numeric	                Median imputed + MinMax scaled
-modelYear	      Numeric	                Median imputed + used in car_age
-engineCC	      Numeric	                Median imputed + MinMax scaled
-car_age	        Numeric	                Derived + MinMax scaled
-transmission	  Categorical	            One-hot encoded
-price (lakhs)	  Numeric	                Target variable, kept as is
+
+
+
