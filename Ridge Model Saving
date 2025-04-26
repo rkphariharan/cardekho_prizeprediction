@@ -1,0 +1,53 @@
+# 📦 Final Ridge Model Saving
+
+import pandas as pd
+import numpy as np
+import joblib
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Ridge
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import MinMaxScaler
+
+# 🔵 Paths
+input_file = r"C:\Users\rkpha\Desktop\cardekho\app\preprocessed_dataset.csv"  # Your updated preprocessed dataset
+model_save_path = r"C:\Users\rkpha\Desktop\cardekho\app\ridge_model.pkl"
+imputer_save_path = r"C:\Users\rkpha\Desktop\cardekho\app\imputer.pkl"
+scaler_save_path = r"C:\Users\rkpha\Desktop\cardekho\app\scaler.pkl"
+price_range_save_path = r"C:\Users\rkpha\Desktop\cardekho\app\price_range.npy"
+
+# 🔵 Load Dataset
+df = pd.read_csv(input_file)
+
+# 🔵 Separate Features and Target
+X = df.drop("prize", axis=1)
+y = df["prize"]
+
+# 🔵 Encode Categorical Variables
+X = pd.get_dummies(X)
+
+# 🔵 Imputer + Scaler
+imputer = SimpleImputer(strategy='median')
+scaler = MinMaxScaler()
+
+X_imputed = imputer.fit_transform(X)
+X_scaled = scaler.fit_transform(X_imputed)
+
+# 🔵 Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# 🔵 Train Ridge Regression
+ridge_model = Ridge(alpha=1.0)
+ridge_model.fit(X_train, y_train)
+
+# 🔵 Save Model, Imputer, Scaler
+joblib.dump(ridge_model, model_save_path)
+joblib.dump(imputer, imputer_save_path)
+joblib.dump(scaler, scaler_save_path)
+
+# 🔵 Save Price Range
+price_min = y.min()
+price_max = y.max()
+np.save(price_range_save_path, np.array([price_min, price_max]))
+
+print("\n✅ Ridge model, imputer, scaler, and price range saved successfully!")
