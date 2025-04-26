@@ -1,0 +1,48 @@
+import pandas as pd
+
+# Load the structured dataset
+input_file = 'structured_dataset.csv'
+df = pd.read_csv(input_file)
+
+# Drop 'engineCC' if exists
+if 'engineCC' in df.columns:
+    df = df.drop('engineCC', axis=1)
+
+# Create 'signature' column
+df['signature'] = df['oem'].astype(str) + "_" + df['model'].astype(str) + "_" + df['variantName'].astype(str)
+
+# Rename columns properly
+df = df.rename(columns={
+    'price(in lakhs)': 'prize',
+    'City': 'city',
+    'variantName': 'Variant',
+    'bt': 'Body Type',
+    'ft': 'Fuel Type',
+    'ownerNo': 'ownerno',
+    'modelYear': 'modelyear'
+})
+
+# Reorder columns exactly as specified
+df = df[[
+    'oem', 
+    'model', 
+    'modelyear', 
+    'Variant', 
+    'transmission', 
+    'Body Type', 
+    'Fuel Type', 
+    'km', 
+    'ownerno', 
+    'prize', 
+    'city', 
+    'signature'
+]]
+
+# Sort rows cleanly
+df = df.sort_values(by=['oem', 'model', 'Variant', 'transmission', 'Body Type', 'Fuel Type']).reset_index(drop=True)
+
+# Save final dataset
+output_file = 'final_segmented_structured_dataset.csv'
+df.to_csv(output_file, index=False)
+
+print(f"Final structured dataset saved as: {output_file}")
