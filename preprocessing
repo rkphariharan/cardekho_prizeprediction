@@ -1,0 +1,48 @@
+import pandas as pd
+import numpy as np
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import MinMaxScaler
+
+# Load dataset
+df = pd.read_csv(r"C:\Users\rkpha\Desktop\cardekho\app\segmented_structured_dataset.csv")
+
+# 1. Handling Missing Values
+numerical_cols = ['modelyear', 'km', 'ownerno']
+target_col = ['prize']
+categorical_cols = ['oem', 'model', 'Variant', 'transmission', 'Body Type', 'Fuel Type', 'city', 'signature']
+
+num_imputer = SimpleImputer(strategy='median')
+df[numerical_cols] = num_imputer.fit_transform(df[numerical_cols])
+
+cat_imputer = SimpleImputer(strategy='most_frequent')
+df[categorical_cols] = cat_imputer.fit_transform(df[categorical_cols])
+
+target_imputer = SimpleImputer(strategy='median')
+df[target_col] = target_imputer.fit_transform(df[target_col])
+
+# 2. Standardizing Data Formats
+# No further changes needed
+
+# 3. Encoding Categorical Variables
+df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=False)
+
+# 4. Normalizing Numerical Features
+scaler = MinMaxScaler()
+df_encoded[numerical_cols] = scaler.fit_transform(df_encoded[numerical_cols])
+
+# 5. Removing Outliers (IQR Method)
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+df_encoded = remove_outliers_iqr(df_encoded, 'km')
+df_encoded = remove_outliers_iqr(df_encoded, 'prize')
+
+# Save final dataset
+output_file = 'final_preprocessed_dataset.csv'
+df_encoded.to_csv(output_file, index=False)
+print(f"Final preprocessed dataset saved as: {output_file}")
