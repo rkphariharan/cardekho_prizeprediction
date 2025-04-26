@@ -1,38 +1,54 @@
-# Extract and save only the best performing Random Forest model from merged dataset
-
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.impute import SimpleImputer
 import joblib
 
-# Reload and prepare data
-df = pd.read_csv("/mnt/data/MERGED_ALL.csv")
+# -------------------- Load the dataset --------------------
+df = pd.read_csv(r"C:\Users\rkpha\Desktop\cardekho\app\MERGED_ALL.csv")
+
+# Target and features
 target = 'price(in lakhs)'
 X = df.drop(columns=[target])
 y = df[target]
 
-# Drop high-cardinality columns
-drop_cols = [col for col in X.columns if 'model_' in col or 'variantName_' in col or 'oem_' in col]
-X = X.drop(columns=drop_cols)
+# -------------------- Separate numeric and categorical --------------------
+num_cols = ["km", "ownerNo", "modelYear", "engineCC"]
+cat_cols = [col for col in X.columns if col not in num_cols]
 
-# Impute and scale
+X_numeric = X[num_cols]
+X_categorical = X[cat_cols]
+
+# -------------------- Preprocess numeric --------------------
 imputer = SimpleImputer(strategy='median')
-X_imputed = imputer.fit_transform(X)
+X_numeric_imputed = imputer.fit_transform(X_numeric)
 
 scaler = MinMaxScaler()
-y_scaled = scaler.fit_transform(y.values.reshape(-1, 1)).ravel()
+X_numeric_scaled = scaler.fit_transform(X_numeric_imputed)
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X_imputed, y_scaled, test_size=0.2, random_state=42)
+X_numeric_final = pd.DataFrame(X_numeric_scaled, columns=num_cols)
 
-# Train Random Forest
-rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-rf_model.fit(X_train, y_train)
+# -------------------- Preprocess categorical --------------------
+X_categorical_final = pd.get_dummies(X_categorical)
 
-# Save model, imputer, scaler
-joblib.dump(rf_model, "/mnt/data/random_forest_model.pkl")
-joblib.dump(imputer, "/mnt/data/imputer.pkl")
-joblib.dump(MinMaxScaler().fit(X), "/mnt/data/scaler.pkl")  # For input normalization, use fitted X scaler
+# -------------------- Combine numeric and categorical --------------------
+X_final = pd.concat([X_numeric_final.reset_index(drop=True), X_categorical_final.reset_index(drop=True)], axis=1)
 
-"/mnt/data/random_forest_model.pkl", "/mnt/data/imputer.pkl", "/mnt/data/scaler.pkl"
+# -------------------- Normalize target --------------------
+price_min = y.min()
+price_max = y.max()
+y_scaled = (y - price_min) / (price_max - price_min)
+
+# -------------------- Train the RandomForest model --------------------
+X_train, X_test, y_train, y_test = train_test_split(X_final, y_scaled, test_size=0.2, random_state=42)
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# -------------------- Save model and preprocessing objects --------------------
+joblib.dump(model, "random_forest_model.pkl")
+joblib.dump(imputer, "imputer.pkl")
+joblib.dump(scaler, "scaler.pkl")
+joblib.dump({'min': price_min, 'max': price_max}, "price_range.pkl")
+
+print("✅ Model retrained and all files saved successfully!")
