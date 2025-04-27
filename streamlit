@@ -1,0 +1,67 @@
+import streamlit as st
+import pickle
+import numpy as np
+import pandas as pd
+
+# Load all artifacts
+model = pickle.load(open('Gradientboost_model.pkl', 'rb'))
+imputer = pickle.load(open('imputer.pkl', 'rb'))
+scaler = pickle.load(open('scaler.pkl', 'rb'))
+feature_names = pickle.load(open('feature_names.pkl', 'rb'))
+price_min, price_max = np.load('price_range.npy')
+dropdown_data = pd.read_csv('segmented_structured_dataset.csv')
+
+# Streamlit app
+st.title("🚗 Used Car Price Prediction App")
+
+st.markdown("""
+Enter the details below to predict the estimated **Used Car Price**:
+""")
+
+# Collect independent inputs
+city = st.selectbox('Select City', sorted(dropdown_data['city'].dropna().unique()))
+owner_no = st.selectbox('Number of Previous Owners', sorted(dropdown_data['ownerno'].dropna().unique()))
+km_driven = st.number_input('Kilometers Driven', min_value=0, value=50000)
+
+# Hierarchy selections
+make = st.selectbox('Select Car Make', sorted(dropdown_data['make'].dropna().unique()))
+
+# Filter based on make
+transmission_options = dropdown_data[dropdown_data['make'] == make]['transmission'].dropna().unique()
+transmission = st.selectbox('Select Transmission Type', sorted(transmission_options))
+
+bodytype_options = dropdown_data[dropdown_data['make'] == make]['Body Type'].dropna().unique()
+body_type = st.selectbox('Select Body Type', sorted(bodytype_options))
+
+fuel_options = dropdown_data[dropdown_data['make'] == make]['Fuel Type'].dropna().unique()
+fuel_type = st.selectbox('Select Fuel Type', sorted(fuel_options))
+
+model_year = st.number_input('Model Year', min_value=1980, max_value=2025, value=2018)
+
+# Predict button
+if st.button('Predict Price'):
+    input_dict = {
+        'modelyear': model_year,
+        'km': km_driven,
+        'ownerno': owner_no,
+        'make_' + make: 1,
+        'transmission_' + transmission: 1,
+        'Body Type_' + body_type: 1,
+        'Fuel Type_' + fuel_type: 1,
+        'city_' + city: 1
+    }
+
+    input_df = pd.DataFrame(columns=feature_names)
+    input_df.loc[0] = 0  # Initialize all to 0
+    for key in input_dict:
+        if key in input_df.columns:
+            input_df.loc[0, key] = input_dict[key]
+
+    # Predict
+    price = model.predict(input_df)[0]
+    predicted_price = np.clip(price, price_min, price_max)  # Clip within known range
+
+    st.success(f"💰 Estimated Used Car Price: ₹ {predicted_price:,.2f}")
+
+st.markdown("---")
+st.caption("Built with ❤️ using Streamlit and Machine Learning")
