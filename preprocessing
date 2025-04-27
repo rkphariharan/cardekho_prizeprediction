@@ -1,48 +1,53 @@
-import pandas as pd
-import numpy as np
 from sklearn.impute import SimpleImputer
+import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.impute import SimpleImputer
 
-# Load dataset
-df = pd.read_csv(r"C:\Users\rkpha\Desktop\cardekho\app\segmented_structured_dataset.csv")
 
-# 1. Handling Missing Values
-numerical_cols = ['modelyear', 'km', 'ownerno']
-target_col = ['prize']
-categorical_cols = ['oem', 'model', 'Variant', 'transmission', 'Body Type', 'Fuel Type', 'city', 'signature']
+# Load the dataset
+dataset = pd.read_csv(r"C:\Users\rkpha\Desktop\cardekho\app\segmented_structured_dataset.csv")
 
-num_imputer = SimpleImputer(strategy='median')
-df[numerical_cols] = num_imputer.fit_transform(df[numerical_cols])
+# Dropping the 'Unnamed: 9' column
+dataset = dataset.drop(columns=['Unnamed: 9'])
 
-cat_imputer = SimpleImputer(strategy='most_frequent')
-df[categorical_cols] = cat_imputer.fit_transform(df[categorical_cols])
+# Handling missing values
+# Impute missing values for numerical columns with the median
+numerical_cols = ['modelyear', 'km', 'ownerno', 'Prize']
+imputer_numerical = SimpleImputer(strategy='median')
+dataset[numerical_cols] = imputer_numerical.fit_transform(dataset[numerical_cols])
 
-target_imputer = SimpleImputer(strategy='median')
-df[target_col] = target_imputer.fit_transform(df[target_col])
+# Impute missing values for categorical columns with the mode (most frequent)
+categorical_cols = ['Body Type']
+imputer_categorical = SimpleImputer(strategy='most_frequent')
+dataset[categorical_cols] = imputer_categorical.fit_transform(dataset[categorical_cols])
 
-# 2. Standardizing Data Formats
-# No further changes needed
+# Standardizing data formats for 'km' column (removing 'kms' if present and converting to int)
+dataset['km'] = dataset['km'].fillna(dataset['km'].median())  # Filling NaN values if any
+dataset['km'] = dataset['km'].astype(int)
 
-# 3. Encoding Categorical Variables
-df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=False)
+# Encoding categorical variables
+dataset = pd.get_dummies(dataset, columns=['make', 'transmission', 'Body Type', 'Fuel Type', 'city'], drop_first=True)
 
-# 4. Normalizing Numerical Features
+# Normalizing numerical features
 scaler = MinMaxScaler()
-df_encoded[numerical_cols] = scaler.fit_transform(df_encoded[numerical_cols])
+dataset[numerical_cols] = scaler.fit_transform(dataset[numerical_cols])
 
-# 5. Removing Outliers (IQR Method)
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+# Removing outliers using IQR method for 'km' and 'Prize'
+Q1_km = dataset['km'].quantile(0.25)
+Q3_km = dataset['km'].quantile(0.75)
+IQR_km = Q3_km - Q1_km
+lower_bound_km = Q1_km - 1.5 * IQR_km
+upper_bound_km = Q3_km + 1.5 * IQR_km
 
-df_encoded = remove_outliers_iqr(df_encoded, 'km')
-df_encoded = remove_outliers_iqr(df_encoded, 'prize')
+dataset = dataset[(dataset['km'] >= lower_bound_km) & (dataset['km'] <= upper_bound_km)]
 
-# Save final dataset
-output_file = 'final_preprocessed_dataset.csv'
-df_encoded.to_csv(output_file, index=False)
-print(f"Final preprocessed dataset saved as: {output_file}")
+Q1_prize = dataset['Prize'].quantile(0.25)
+Q3_prize = dataset['Prize'].quantile(0.75)
+IQR_prize = Q3_prize - Q1_prize
+lower_bound_prize = Q1_prize - 1.5 * IQR_prize
+upper_bound_prize = Q3_prize + 1.5 * IQR_prize
+
+dataset = dataset[(dataset['Prize'] >= lower_bound_prize) & (dataset['Prize'] <= upper_bound_prize)]
+
+# Save the processed dataset to a new CSV file
+dataset.to_csv('processed_used_car_data.csv', index=False)
