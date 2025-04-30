@@ -1,0 +1,68 @@
+import pandas as pd
+
+# 🔁 Set your input path here
+input_path = r"C:\Users\rkpha\Desktop\cardekho\app\structured_dataset.csv"
+# 📥 Load dataset
+df = pd.read_csv(input_path)
+
+# 📊 Display dataset properties
+print("✅ Dataset Shape:", df.shape)
+print("\n🧾 Column Names:\n", df.columns.tolist())
+print("\n📌 Data Types:\n", df.dtypes)
+print("\n❗ Missing Values:\n", df.isnull().sum())
+print("\n📈 Descriptive Statistics:\n", df.describe(include='all'))
+
+
+
+  
+✅ Dataset Shape: (8369, 12)
+
+🧾 Column Names:
+ ['City', 'ft', 'km', 'bt', 'ownerNo', 'model', 'modelYear', 'variantName', 'price(in lakhs)', 'transmission', 'oem', 'engineCC']
+
+📌 Data Types:
+ City                object
+ft                  object
+km                   int64
+bt                  object
+ownerNo              int64
+model               object
+modelYear            int64
+variantName         object
+price(in lakhs)    float64
+transmission        object
+oem                 object
+engineCC           float64
+dtype: object
+
+❗ Missing Values:
+ City               0
+ft                 0
+km                 0
+bt                 4
+ownerNo            0
+model              0
+modelYear          0
+variantName        0
+price(in lakhs)    0
+transmission       0
+oem                0
+engineCC           4
+dtype: int64
+
+📈 Descriptive Statistics:
+          City      ft            km  ... transmission     oem     engineCC
+count    8369    8369  8.369000e+03  ...         8369    8369  8365.000000
+unique      6       5           NaN  ...            2      33          NaN
+top     Delhi  Petrol           NaN  ...       Manual  Maruti          NaN
+freq     1485    5554           NaN  ...         6052    2252          NaN
+mean      NaN     NaN  5.897430e+04  ...          NaN     NaN  1424.735923
+std       NaN     NaN  7.406100e+04  ...          NaN     NaN   477.629144
+min       NaN     NaN  0.000000e+00  ...          NaN     NaN     0.000000
+25%       NaN     NaN  3.000000e+04  ...          NaN     NaN  1197.000000
+50%       NaN     NaN  5.369200e+04  ...          NaN     NaN  1248.000000
+75%       NaN     NaN  8.000000e+04  ...          NaN     NaN  1498.000000
+max       NaN     NaN  5.500000e+06  ...          NaN     NaN  5000.000000
+
+[11 rows x 12 columns]
+
